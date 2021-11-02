@@ -1,0 +1,247 @@
+{
+  "input": {
+    "add_data_name": "",
+    "assay_input": "None",
+    "continent_input": "None",
+    "country_input": "None",
+    "CqIntensity_input": "None",
+    "date_input": [
+      "2010-01-01",
+      "2021-10-31"
+    ],
+    "establishmentMeans_input": "None",
+    "family_input": "None",
+    "genus_input": "None",
+    "load_MDMAPR_data": 0,
+    "load_saved_data": null,
+    "locality_input": "None",
+    "machine_input": "None",
+    "metadata_file": {
+      "name": [
+        "Phillips_OKMetadata_Template_abi_filled.xlsx"
+      ],
+      "size": [
+        91645
+      ],
+      "type": [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ],
+      "datapath": [
+        "0.xlsx"
+      ]
+    },
+    "metadata_file_add": null,
+    "mymap_bounds": {
+      "north": 75.6721973905529,
+      "east": -17.578125,
+      "south": -21.2893743558604,
+      "west": -142.734375
+    },
+    "mymap_center": {
+      "lng": -80.2262,
+      "lat": 43.5327
+    },
+    "mymap_zoom": 3,
+    "platform": "MIC",
+    "platform_add": "None",
+    "projectID_input": "None",
+    "qpcr_file": {
+      "name": [
+        "AAFC_rdml_file.rdml"
+      ],
+      "size": [
+        59914
+      ],
+      "type": [
+        ""
+      ],
+      "datapath": [
+        "0.rdml"
+      ]
+    },
+    "qpcr_file_add": null,
+    "range": [
+      0,
+      40
+    ],
+    "reset": 0,
+    "reset_add": 0,
+    "SCI_fluorescence_file": {
+      "name": [
+        "std.curve.lori.sample.csv"
+      ],
+      "size": [
+        9912
+      ],
+      "type": [
+        "text/csv"
+      ],
+      "datapath": [
+        "0.csv"
+      ]
+    },
+    "sidebarCollapsed": false,
+    "sidebarItemExpanded": null,
+    "species_input": "None",
+    "stateProvince_input": "None",
+    "submit": 1,
+    "submit_add": 0,
+    "tab_being_displayed": "dashboard",
+    "targetGene_input": "None",
+    "thresholdValueButton": "10",
+    "upload_data_name": "SnapShotTest1"
+  },
+  "output": {
+    "mymap": {
+      "x": {
+        "options": {
+          "crs": {
+            "crsClass": "L.CRS.EPSG3857",
+            "code": null,
+            "proj4def": null,
+            "projectedBounds": null,
+            "options": {
+
+            }
+          },
+          "fullscreenControl": {
+            "position": "topleft",
+            "pseudoFullscreen": false
+          }
+        },
+        "calls": [
+          {
+            "method": "addTiles",
+            "args": [
+              "//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+              null,
+              null,
+              {
+                "minZoom": 0,
+                "maxZoom": 18,
+                "tileSize": 256,
+                "subdomains": "abc",
+                "errorTileUrl": "",
+                "tms": false,
+                "noWrap": false,
+                "zoomOffset": 0,
+                "zoomReverse": false,
+                "opacity": 1,
+                "zIndex": 1,
+                "detectRetina": false,
+                "attribution": "&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"
+              }
+            ]
+          },
+          {
+            "method": "addLegend",
+            "args": [
+              {
+                "colors": [
+                  "#FBD300",
+                  "#FF8600",
+                  "#EA5F94",
+                  "#9D02D7",
+                  "#0000FF"
+                ],
+                "labels": [
+                  "0 < Very strong < 10",
+                  "10 <= Strong < 20",
+                  "20 <= Moderate < 30",
+                  "30 <= Weak < 40",
+                  "None > 40"
+                ],
+                "na_color": null,
+                "na_label": "NA",
+                "opacity": 0.6,
+                "position": "bottomright",
+                "type": "factor",
+                "title": "qPCR Cq Signal Intensity",
+                "extra": null,
+                "layerId": null,
+                "className": "info legend",
+                "group": null
+              }
+            ]
+          },
+          {
+            "method": "addProviderTiles",
+            "args": [
+              "Esri.WorldStreetMap",
+              null,
+              null,
+              {
+                "errorTileUrl": "",
+                "noWrap": false,
+                "detectRetina": false
+              }
+            ]
+          }
+        ],
+        "setView": [
+          [
+            43.5327,
+            -80.2262
+          ],
+          3,
+          [
+
+          ]
+        ]
+      },
+      "evals": [
+
+      ],
+      "jsHooks": [
+
+      ],
+      "deps": [
+        {
+          "name": "lfx-fullscreen",
+          "version": "1.0.2",
+          "src": {
+            "href": "lfx-fullscreen-1.0.2"
+          },
+          "meta": null,
+          "script": "lfx-fullscreen-prod.js",
+          "stylesheet": "lfx-fullscreen-prod.css",
+          "head": null,
+          "attachment": null,
+          "package": null,
+          "all_files": true
+        },
+        {
+          "name": "leaflet-providers",
+          "version": "1.9.0",
+          "src": {
+            "href": "leaflet-providers-1.9.0"
+          },
+          "meta": null,
+          "script": "leaflet-providers_1.9.0.js",
+          "stylesheet": null,
+          "head": null,
+          "attachment": null,
+          "package": null,
+          "all_files": false
+        },
+        {
+          "name": "leaflet-providers-plugin",
+          "version": "2.0.4.1",
+          "src": {
+            "href": "leaflet-providers-plugin-2.0.4.1"
+          },
+          "meta": null,
+          "script": "leaflet-providers-plugin.js",
+          "stylesheet": null,
+          "head": null,
+          "attachment": null,
+          "package": null,
+          "all_files": true
+        }
+      ]
+    }
+  },
+  "export": {
+
+  }
+}

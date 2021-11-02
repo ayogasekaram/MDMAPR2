@@ -1,0 +1,50 @@
+{
+  "input": {
+    "add_data_name": "",
+    "assay_input": "None",
+    "continent_input": "None",
+    "country_input": "None",
+    "CqIntensity_input": "None",
+    "date_input": [
+      "2010-01-01",
+      "2021-10-31"
+    ],
+    "establishmentMeans_input": "None",
+    "family_input": "None",
+    "genus_input": "None",
+    "load_MDMAPR_data": 0,
+    "load_saved_data": null,
+    "locality_input": "None",
+    "machine_input": "None",
+    "metadata_file": null,
+    "metadata_file_add": null,
+    "platform": "None",
+    "platform_add": "None",
+    "projectID_input": "None",
+    "qpcr_file": null,
+    "qpcr_file_add": null,
+    "range": [
+      0,
+      40
+    ],
+    "reset": 0,
+    "reset_add": 0,
+    "SCI_fluorescence_file": null,
+    "sidebarCollapsed": false,
+    "sidebarItemExpanded": null,
+    "species_input": "None",
+    "stateProvince_input": "None",
+    "submit": 0,
+    "submit_add": 0,
+    "tab_being_displayed": "dataImport",
+    "targetGene_input": "None",
+    "thresholdValueButton": "10",
+    "upload_data_name": ""
+  },
+  "output": {
+
+  },
+  "export": {
+
+  }
+}
