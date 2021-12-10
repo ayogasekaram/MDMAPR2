@@ -1,0 +1,408 @@
+---
+title: "RDML Data Pre-Processing Module"
+author: "Abinaya Yogasekaram"
+date: "02/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## RDML Data Pre-Processing Module 
+
+Using the formatting functions that will convert different qPCR machine outputs into a standardized file type that is compatible with analysis with MDMAPR.
+This script follows the workflow below:
+
+1. Input both the fluorescence data and metadata.
+2. Ensure the order of the metadata matches the order of the fluorescence data
+3. Remove any null records (controls), and merge both sets of data
+4. Extract the fluorescence data from the available records 
+5. Extract the supporting metadata (reactionID, well,Location, Etc.)
+6. Organize and compress the data into an RDML file.
+
+This Tutorial/Module was developed using the [vignette](https://mran.microsoft.com/snapshot/2017-07-30/web/packages/RDML/vignettes/RDML.html) provided by the RDML consortium. 
+
+### Loading Required Packges
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Packages used
+packages = c("tidyverse","RDML","readxl")
+## Load or install&load
+package.check <- lapply(packages,
+                        FUN = function(x) {
+                          if (!require(x, character.only = TRUE)) {
+                            install.packages(x, dependencies = TRUE)
+                            library(x, character.only = TRUE)
+                          }
+                        }
+)
+
+```
+
+### Read-in Required Helper Functions
+
+```{r}
+# helper function to read in the metadata sheets as separate dataframes all contained within a list,
+
+# ensure data type for fluorescence file, should be numeric and will convert to numeric if not
+data_type_check <- function (raw_fluorescence) {
+  verfied_fluorescence <- as.data.frame(apply(raw_fluorescence[,2:ncol(raw_fluorescence)], 2, function(x)
+    as.numeric(as.character(x))),
+    str(raw_fluorescence))
+  verfied_fluorescence$wellLocation <- raw_fluorescence$wellLocation
+  verfied_fluorescence <- as.data.frame(verfied_fluorescence[,c(ncol(verfied_fluorescence),1:ncol(verfied_fluorescence)-1)])
+  print("data are all numeric")
+  return(verfied_fluorescence)
+}
+
+# names of the list elements are the same as the sheet titles
+read_excel_allsheets <- function(filename, tibble = FALSE) {
+  sheets <- readxl::excel_sheets(filename)
+  x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+  if(!tibble) x <- lapply(x, as.data.frame)
+  names(x) <- sheets
+  x
+}
+
+# format the metadata excel file
+format_qPCR_metadata_RDML <- function(metadataFile) {
+  
+  #Creating metadata table
+  metadata_table <-
+    distinct(left_join(metadataFile$assay_Table, metadataFile$standardCurveResults_Table[, c("standardCurveID", "assayID", "standardCurveName", "SCdate", "SCrecordedBy", "SCdataNotes")], by = "assayID"))
+  
+  metadata_table <-  left_join(metadataFile$results_Table, metadata_table, by = "assayID")
+  
+  metadata_table <- left_join(metadata_table, metadataFile$replicate_Table, by = "extractID")
+  
+  metadata_table <- left_join(metadata_table, metadataFile$project_Table, by = "stationID")
+  
+  
+  #Organize columns
+  metadata_table <- as.data.frame(metadata_table[, c(
+    "resultID","runID", "assayID","pcrChemistryID","extractID","wellLocation","sampleName", "copyNumber","control","userProvidedThresholdValue", "userProvidedCqValue","runRecordedBy", "runDate","runTime","runPlatform","machineID","reactionConditions","reactionVolume","templateAmount","forwardPrimerBatch","reversePrimerBatch","dNTPConcentration", "primerConcentration","probeConcentration","Mg2+Concentration","polymeraseBatch","polymeraseConcentrations","thermocyclerParameters","pcrDataNotes","taxonID","establishmentMeans","assayName","assayOwnership","assayDescription","assayCitation","assayDate","geneTarget","geneSymbol","dilutions","replicates","primerR","primerF","probe","ampliconLength (bp)","probeFluorescentTag","dye(s)","quencher","probeModification","kingdom","phylum","class","order","family","genus","subgenus","species","vernacularName","organismScope","replicateID","extractName","analyst", "extractionDate", "extractionTime", "location", "extractionMethod", "methodCitation", "extractionNotes","tubePlateID","frozen", "fixed","dnaStorageLocation","extractMethodOfStorage","dnaVolume","quantificationMethod", "concentration(ng/ul)","stationID","collectorName","replicateName","collectionDate","collectionTime","storageID","DateOfStorage","methodOfStorage","minimumElevationInMeters","maximumElevationInMeters","verbatimElevation","minimumDepthInMeters","maximumDepthInMeters","verbatimDepth", "flowRate(m/s)", "filterType","filtrationDuration(mins)","volumeFiltered","processLocation","replicationNumber","riparianVegetationPercentageCover","dissolvedOxygen(mg/L)","waterTemperature(C)","pH","TSS(mg/L)","EC(uS/cm)","turbidity(NTU)","discharge","tide","chlorophyl","salinity(ppt)","contaminants(ng/g)","traceMetals(mg/kg)","organicContent(%)","microbialActivity","grainSize","replicateDataNotes","siteID","stationName","decimalLongitude","decimalLatitude","geographicRegionID","locality","estimatedPerimeter","estimatedSurfaceArea(m2)","siteType","siteLength(m2)","projectID","continent","country","stateProvince","municipality","projectCreationDate","projectName", "projectRecordedBy","projectOwner","projectContactEmail","projectDescription","InstitutionID","projectDataNotes","standardCurveID","standardCurveName","SCdate","SCrecordedBy","SCdataNotes")])
+  
+  return(metadata_table)
+}
+
+#Function removes null records (controls or empty runs) from associated fluorescence file based on if sample name contains 'null' in metadata file.
+null_records_to_remove_flur <- function(meta_data, fluor_file) {
+  if (length(which(grepl("null", tolower(meta_data$sampleName)))) != 0){
+    fluor_file <- as.data.frame(fluor_file[-c(which(grepl("null", tolower(meta_data$sampleName)))+1)],)
+    meta_data <- meta_data[-c(which(grepl("null", tolower(meta_data$sampleName)))), ]}
+  scraped_files = list(fluor_file, meta_data)
+  return (scraped_files)}
+
+# merge raw fluorescence and metadata
+merge_meta_flu_RDML <- function (processed_data_list){
+  
+  merged_file <- merge(processed_data_list[[2]], processed_data_list[[1]], by="wellLocation")
+  merged_file <- merged_file %>% relocate(starts_with("well"), .after = "extractID")
+  merged_file <- merged_file %>% relocate(starts_with("Cycle_"), .after = "control")
+  
+  return(merged_file)
+}
+
+# convert letters to numbers (reaction ID in RDML file must be numeric)
+letter2number <- function(x) {utf8ToInt(x) - utf8ToInt("a") + 1L}
+
+# create RDML file
+process_RDML <- function(merged_file){
+  fdata <- select(merged_file,contains("Cycle_Number"))
+  fdata <- as.data.frame(t(fdata))
+  fdata$cycle <- 1:nrow(fdata)
+  fdata <- select(fdata,"cycle", everything())
+  fdata <- sapply(fdata, as.numeric )
+  
+  fdata_descr <- data.frame(
+    fdata.name = colnames(fdata)[2:ncol(fdata)],
+    exp.id = as.character(merged_file$projectID),
+    run.id = as.character(merged_file$runID),
+    position= as.character(merged_file$wellLocation),
+    #position=as.numeric(as.factor(merged_file$wellLocation)),
+    #react.id = if(is.character(merged_file$assayID)) unname(sapply(tolower(merged_file$assayID), letter2number)) else (merged_file$assayID),
+    react.id=if(is.character(merged_file$wellLocation)) unname(sapply(tolower(merged_file$wellLocation), letter2number)) else (merged_file$wellLocation),
+    sample = as.character(merged_file$sampleName),
+    sampleType=as.character(ifelse(is.na(merged_file$replicateName), "ctrl", merged_file$replicateName)),
+    sample.type = as.character(replicate(nrow(merged_file),"unkn")),
+    target = as.character(merged_file$geneTarget),
+    target.dyeId = as.character(ifelse(is.na(merged_file$probeFluorescentTag), "Unknown",merged_file$probeFluorescentTag)),
+    stringsAsFactors = FALSE
+  )
+  
+  fdata_rdml <- RDML$new()
+  # Add fluorescence data
+  fdata_rdml$SetFData(fdata, fdata_descr)
+  
+  # Observe object
+  fdata_rdml$AsDendrogram()
+  return(fdata_rdml)
+}
+```
+
+### Raw Data Processing 
+
+```{r}
+# Set File Names
+fluorescence_data <- "MIC_experimental_raw_fluorescence_data.csv"
+metadata_file <- "MIC_qPCR_Metadata_file.xlsx"
+
+# Uncomment the lines below to run the biomeme version of the module
+# fluorescence_data <-"biomemetwo3_experimental_raw_fluorescence_data.csv"
+# metadata_file <- "biomemetwo3_qPCR_Metadata_file.xlsx"
+
+# Platform Name
+# "biomemefranklin", "MIC"
+platform <- "MIC"
+
+process_MIC_raw_data <- function(raw_fluorescence){
+  raw_fluorescence <- as.data.frame(t(raw_fluorescence[, 2:ncol(raw_fluorescence)]))
+  # add consistent column names
+  #Changing column names to consistent with naming convention in database
+  total_runs <- ncol(raw_fluorescence)
+  colnames(raw_fluorescence) <- c(paste0("Cycle_Number", 1:total_runs))
+  # add a column for merging with metadata
+  raw_fluorescence$wellLocation <- as.numeric(gsub("[^0-9]", "", rownames(raw_fluorescence)))
+  # move wellLocation to the front
+  raw_fluorescence <- as.data.frame(raw_fluorescence[,c(ncol(raw_fluorescence),1:ncol(raw_fluorescence)-1)])
+  print(paste0("number of wells: ", nrow(raw_fluorescence), ", number of cycles: ", ncol(raw_fluorescence)-1))
+  return(raw_fluorescence)
+}
+
+process_biomeme_raw_data <- function(raw_fluorescence){
+  #Creating dataframe with fluorescence values from biomem raw qPCR file
+  end_row <-(which(grepl('Raw Fluorescence', raw_fluorescence$Run.Name))) - 2
+  raw_fluorescence <- raw_fluorescence[11:end_row, 2:41]
+  #Changing column names to consistent with naming convention in database
+  total_runs <- ncol(raw_fluorescence)
+  colnames(raw_fluorescence) <- c(paste0("Cycle_Number", 1:total_runs))
+  #change all values to numeric
+  cols = c(1:total_runs)
+  raw_fluorescence[, cols] <- apply(raw_fluorescence[, cols], 2, function(x)  as.numeric(as.character(x)))
+  # add wellLocation (key for merging)
+  raw_fluorescence$wellLocation <- fluorescence_file[11:end_row, 1]
+  raw_fluorescence <- as.data.frame(raw_fluorescence[,c(ncol(raw_fluorescence),1:ncol(raw_fluorescence)-1)])
+  print(paste0("number of wells: ", nrow(raw_fluorescence), ", number of cycles: ", ncol(raw_fluorescence)-1))
+  return (raw_fluorescence)
+  }
+
+if (platform=="MIC"){
+  # process and format the MIC data
+  processed_raw_flu <- process_MIC_raw_data(read.csv(fluorescence_data))
+} else if (platform=="biomemefranklin"){
+  # process and format the MIC data
+  processed_raw_flu <- process_biomeme_raw_data(read.csv(fluorescence_data))
+}
+
+# ensure data type is numeric and convert if necessary
+processed_raw_flu <- data_type_check(processed_raw_flu)
+
+# process and format the metadata
+metadata <- read_excel_allsheets(metadata_file)
+formatted_metadata <- format_qPCR_metadata_RDML(metadata)
+
+#remove control records
+scraped_file_list <- null_records_to_remove_flur(formatted_metadata, processed_raw_flu)
+
+# merge data files
+merged_file <- merge_meta_flu_RDML(scraped_file_list)
+# create RDML file
+RDML.file <- process_RDML(merged_file)
+# select a file name for export
+outputname <- "processed_rdml_file.RDML"
+# export RDML file for later use
+RDML.file$AsXML(outputname)
+
+```
+
+
+#### Loop Structure for converting multiple files into RDML
+
+If there are multiple fluorescence files you would like to convert into RDML, the following loop operationalizes the conversion of files IF placed in the following directory/naming structure.
+
+1) Place the fluorescence files and Metadata files into a directory.
+2) Ensure a 1-to-1 naming structure between the fluorescence and metadata files (ex. Hanlon_Run1.csv and Hanlon_Run1.xlsx)
+2) Replace the following flu_files and metadata_files code with the path to the directory.
+3) Run the for loop. 
+```{r}
+
+file_directory_path <- "/Users/abiyogasekaram/Documents/MDMAPR/DataAnalysis2021/BrookTrout"
+meta_files_path <- "/Users/abiyogasekaram/Documents/MDMAPR/DataAnalysis2021/BrookTrout/Metadata\ Files"
+# vector of all fluorescence files
+flu_files <- list.files(path = file_directory_path, pattern = ".csv", all.files = FALSE,full.names = T, recursive = FALSE,ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+#vector of all the metadata files
+metadata_files <- list.files(path = meta_files_path, pattern = ".xlsx", all.files = FALSE,full.names = T, recursive = FALSE,ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+directory_path <- 
+
+for (i in 1:length(flu_files)){
+  fluorescence_data <- flu_files[i]
+  metadata_file <- metadata_files[i]
+
+  run_name <- sub(pattern = "(.*)\\..*$", replacement = "\\1", basename(flu_files[i]))
+
+  # process and format the MIC data
+  processed_raw_flu <- process_MIC_raw_data(read.csv(fluorescence_data))
+
+  # ensure data type is numeric and convert if necessary
+  processed_raw_flu <- data_type_check(processed_raw_flu)
+
+  # process and format the metadata
+  metadata <- read_excel_allsheets(metadata_file)
+  formatted_metadata <- format_qPCR_metadata_RDML(metadata)
+
+  #remove control records
+  # scraped_file_list <- null_records_to_remove_flur(formatted_metadata, processed_raw_flu)
+  scraped_file_list <- list(processed_raw_flu, formatted_metadata)
+
+  # merge data files
+  merged_file <- merge_meta_flu_RDML(scraped_file_list)
+  # create RDML file
+  RDML.file <- process_RDML(merged_file)
+  # select a file name for export
+  outputname <- paste(file_directory_path,run_name,".rdml", sep = "")
+  # export RDML file for later use
+  RDML.file$AsXML(outputname)
+}
+```
+
+
+### Standard Curve Data Processing Module 
+
+A separate RDML file will need to be created for the standard curve data. 
+
+#### Functions for Standard Curve Data Only
+
+```{r}
+format_standardCurve_metadata <- function (standardCurve_metadata) {
+  standardCurve_Table <- read_excel(standardCurve_metadata, sheet = 5)
+  standardCurve_Table <- as.data.frame(standardCurve_Table[, c("SCresultID",
+                                                                  "runID",
+                                                                  "pcrChemistryID",
+                                                                  "standardCurveID",
+                                                                  "wellLocation",
+                                                                  "sampleName",
+                                                                  "copyNumber",
+                                                                  "control",
+                                                                  "standardConc",
+                                                                  "userProvidedThresholdValue",
+                                                                  "userProvidedCqValue",
+                                                                  "runRecordedBy",
+                                                                  "runDate",
+                                                                  "runTime",
+                                                                  "runPlatform",
+                                                                  "machineID",
+                                                                  "reactionConditions",
+                                                                  "reactionVolume",
+                                                                  "templateAmount",
+                                                                  "forwardPrimerBatch",
+                                                                  "reversePrimerBatch",
+                                                                  "dNTPConcentration",
+                                                                  "primerConcentration",
+                                                                  "probeConcentration",
+                                                                  "Mg2+Concentration",
+                                                                  "polymeraseBatch",
+                                                                  "polymeraseConcentrations",
+                                                                  "thermocyclerParameters",
+                                                                  "pcrDataNotes",
+                                                                  "assayID",
+                                                                  "standardCurveName",
+                                                                  "SCdate",
+                                                                  "SCrecordedBy",
+                                                                  "SCdataNotes",
+                                                                  "LOD",
+                                                                  "LOQ")])
+  return (standardCurve_Table)
+}
+
+merge_meta_flu_std_RDML <- function (processed_data_list){
+  merged_file <- merge(processed_data_list[[2]], processed_data_list[[1]], by="wellLocation")
+  merged_file <- merged_file %>% relocate(starts_with("Cycle_"), .after = "control")
+  return(merged_file)
+}
+
+```
+
+
+
+#### RDML Processing for Std. Curve
+```{r}
+process_RDML_Std <- function(merged_file){
+  fdata <- select(merged_file,contains("Cycle_Number"))
+  fdata <- as.data.frame(t(fdata))
+  fdata$cycle <- 1:nrow(fdata)
+  fdata <- select(fdata,"cycle", everything())
+  fdata <- sapply(fdata, as.numeric)
+  fdata <- as.data.frame(fdata)
+  
+  fdata_descr <- data.frame(
+    fdata.name = colnames(fdata)[2:ncol(fdata)],
+    exp.id = merged_file$standardCurveID,
+    run.id = merged_file$runID,
+    position=merged_file$wellLocation,
+    #position=as.numeric(as.factor(merged_file$wellLocation)),
+    #react.id = if(is.character(merged_file$assayID)) unname(sapply(tolower(merged_file$assayID), letter2number)) else (merged_file$assayID),
+    react.id = if(is.character(merged_file$wellLocation)) unname(sapply(tolower(merged_file$wellLocation), letter2number)) else (merged_file$wellLocation),
+    sample = replicate(nrow(merged_file),"Standard Curve"),
+    #sampleType=merged_file$replicateName,
+    sample.type = replicate(nrow(merged_file),"std"),
+    target = replicate(nrow(merged_file),"unknown"),
+    target.dyeId = ifelse(is.na(merged_file$pcrChemistryID), "Unknown",merged_file$pcrChemistryID),
+    stringsAsFactors = FALSE
+  )
+  
+  fdata_rdml <- RDML$new()
+  # Add fluorescence data
+  fdata_rdml$SetFData(fdata, fdata_descr)
+  
+  # Observe object
+  fdata_rdml$AsDendrogram()
+  return(fdata_rdml)
+}
+```
+
+### Std. Curve RDML Creation
+
+set variables for platform, path to fluorescence data, path to metadata template file
+```{r}
+platform <- "MIC"
+
+std_fluorescence_data <- "MIC_standard_curve_raw_fluorescence_data.csv"
+metadata_file <- "MIC_qPCR_Metadata_file.xlsx"
+
+```
+
+
+```{r}
+
+# same raw data processing function can be used as above
+if (platform=="MIC"){
+  # process and format the MIC data
+  std_fluorescence <- process_MIC_raw_data(read.csv(std_fluorescence_data))
+} else if (platform=="biomemefranklin"){
+  # process and format the MIC data
+  std_fluorescence <- process_biomeme_raw_data(read.csv(std_fluorescence_data))
+}
+
+
+# ensure data type is numeric and convert if necessary
+std_fluorescence <- data_type_check(std_fluorescence)
+
+# process and format the metadata
+formatted_metadata <- format_standardCurve_metadata(metadata_file)
+
+#remove control records
+scraped_file_list <- null_records_to_remove_flur(formatted_metadata, std_fluorescence)
+
+# merge data files
+merged_file <- merge_meta_flu_std_RDML(scraped_file_list)
+# create RDML file
+RDML.std.file <- process_RDML_Std(merged_file)
+# select a file name for export
+outputname <- "processed_rdml_std_file.RDML"
+# export RDML file for later use
+RDML.std.file$AsXML(outputname)
+
+```

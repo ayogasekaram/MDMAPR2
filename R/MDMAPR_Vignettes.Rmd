@@ -1,0 +1,10 @@
+### MDMAPR Analysis Vignettes
+
+- [MDMAPR Functions and Package Usage](https://cran.r-project.org/web/packages/MDMAPR/MDMAPR.pdf)
+- [Converting raw qPCR data to RDML](https://github.com/ayogasekaram/MDMAPRLite/blob/main/RDML_PreProcessing/RDML_Data_Pre-Processing_Module.Rmd)
+- [MDMAPR Demo for eDNA Analysis](https://ctmm-initiative.github.io/ctmm/articles/error.html)
+
+### MDMAPR App Development Documentation
+
+- [Test Case Process Diagram]()
+- [Function Module Diagram]()
