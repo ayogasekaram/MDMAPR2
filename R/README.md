@@ -26,14 +26,8 @@ You can install the released version of MDMAPR from
 install.packages("MDMAPR")
 ```
 
-## Example on how to run MDMAPR without database connection: 
+## Open terminal with r command
 ``` r
-library(MDMAPR)
-
-#Set dbInstance to no
-dbInstance("No")
-
-#Open terminal with r command
 # load packages
 load.lib<-c("shiny", "shinydashboard", "shinyjs","shinyWidgets","leaflet","DBI",
             "leaflet.extras","data.table","ggplot2","dplyr","readxl","plotly","reactable","writexl",
@@ -64,41 +58,41 @@ touch app.R # when you want to reload new changes. Then reload the browser
 browser()
 # to exit brower, type c then enter
 ```
+## Data Import page
 
+<kbd><img src="images/data_import.png" width=600></kbd>
 
+The Data Import page is used to format raw qPCR fluorescence data
+and associated metadata into a format that is acceptable to be added to
+the MDMAPR 2.0 database for storage. On this page, a raw qPCR
+experimental fluorescence file, a raw standard curve fluorescence file,
+and the filled in MDMAPR 2.0 metadata file are required. The Data
+Submission tool will parse the data into 13 CSV files. A preview of the
+tables is viewable on the page. A zipped file of the CSVs can be
+downloaded by pressing the ‘Download Data Submission Files’ button.
+NOTE: Before you can upload the generated CSV data files into their
+respective tables in the MDMAPR 2.0 database, the ID columns (projectID,
+geographicRegionID, siteID, stationID, replicateID, extractID, assayID,
+runID, pcrChemistryID, resultID, standardCurveID, and SCresultID) must
+be manually changed from alphabetical characters to unique numeric IDs.
 
+## Standard Curve Analysis page
 
-## Example on how to format raw qPCR fluoresence file data from MIC, StepOnePlus or Biomeme two3/Franklin machines into a table that includes rows for each well location on qPCR plate and the associated fluorescence data for each reaction cycle. 
-The table is written to the local machine directory as a CSV file. The formatted data can be copied and pasted into the [results_Table](https://github.com/HannerLab/MDMAPR/blob/master/MySQL/MySQL_Table_Template_Files/results_Table.csv) or [standardCurveResults_Table](https://github.com/HannerLab/MDMAPR/blob/master/MySQL/MySQL_Table_Template_Files/standardCurveResults_Table.csv), which are used in the MDMAPR 2.0 MySQL database.
-``` r
-library(MDMAPR)
+<kbd><img src="images/standard_curve.png" width=600></kbd>
 
-#Use formatRawFluorescenceFile function to format raw MIC qPCR fluorescence file.
-formatRawFluorescenceFile(rawFluorescenceFile = "MIC_raw_fluorescence_data.csv",
-                          platform = "MIC", 
-                          rawFluorescenceFile = "MIC_formatted_fluorescence_data.csv")
-
-```
-
-
-## Example on how to add systemCalculatedThresholdValue and systemCalculatedCqValue to the results_Table and standardCurveResults_Table files. 
-The results_Table and standardCurveResults_Table files must have the formatted fluorescence data already input in the file in order for the addThresholdCq function to work. Users can also use the addThresholdCq function to add the userProvidedCqValue's to the file by setting the calculateUserProvidedCq parameter to "Yes". The userProvidedThresholdValue's must be provided in the results_Table and standardCurveResults_Table in order for the addThresholdCq function to calculate the userProvidedCqValue's.
-
-``` r
-library(MDMAPR)
-
-#Use addThresholdCq() to add systemCalculatedThresholdValue, systemCalculatedCqValue, and userProvidedCqValue to results_Table files.
-addThresholdCq(file = "results_Table.csv", 
-               calculateUserProvidedCq = "Yes")
-
-#Use addThresholdCq() to add systemCalculatedThresholdValue and systemCalculatedCqValue to standardCurveResults_Table files. The userProvidedCqValue is not added. 
-addThresholdCq(file "standardCurveResults_Table.csv", 
-               calculateUserProvidedCq = "No")
-
-
-```
-
-
+The Data Submission page is used to format raw qPCR fluorescence data
+and associated metadata into a format that is acceptable to be added to
+the MDMAPR 2.0 database for storage. On this page, a raw qPCR
+experimental fluorescence file, a raw standard curve fluorescence file,
+and the filled in MDMAPR 2.0 metadata file are required. The Data
+Submission tool will parse the data into 13 CSV files. A preview of the
+tables is viewable on the page. A zipped file of the CSVs can be
+downloaded by pressing the ‘Download Data Submission Files’ button.
+NOTE: Before you can upload the generated CSV data files into their
+respective tables in the MDMAPR 2.0 database, the ID columns (projectID,
+geographicRegionID, siteID, stationID, replicateID, extractID, assayID,
+runID, pcrChemistryID, resultID, standardCurveID, and SCresultID) must
+be manually changed from alphabetical characters to unique numeric IDs.
 
 ## Mapping Dashboard
 
@@ -132,20 +126,3 @@ related to the standard curve used for the samples in the
 ‘Presence/Absence Samples’ tab. Lastly, the ‘Standard Curve Plot’ tab
 shows the plotted standard curve.
 
-## Data Submission page
-
-<kbd><img src="images/data_submission.png" width=600></kbd>
-
-The Data Submission page is used to format raw qPCR fluorescence data
-and associated metadata into a format that is acceptable to be added to
-the MDMAPR 2.0 database for storage. On this page, a raw qPCR
-experimental fluorescence file, a raw standard curve fluorescence file,
-and the filled in MDMAPR 2.0 metadata file are required. The Data
-Submission tool will parse the data into 13 CSV files. A preview of the
-tables is viewable on the page. A zipped file of the CSVs can be
-downloaded by pressing the ‘Download Data Submission Files’ button.
-NOTE: Before you can upload the generated CSV data files into their
-respective tables in the MDMAPR 2.0 database, the ID columns (projectID,
-geographicRegionID, siteID, stationID, replicateID, extractID, assayID,
-runID, pcrChemistryID, resultID, standardCurveID, and SCresultID) must
-be manually changed from alphabetical characters to unique numeric IDs.
