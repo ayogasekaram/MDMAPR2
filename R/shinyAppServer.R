@@ -303,13 +303,13 @@ shinyAppServer <- function(input, output, session) {
         raw_multiplex_data_list <- process_Multiplexed_RDML(input$qpcr_file$datapath)
 
         # Increment the progress bar, and update the detail text.
-        incProgress(1/6, detail = paste("Doing part", 1))
+        incProgress(1/6, detail = paste("Processing RDML", 1))
 
         # 2. Read in and format the metadata
         formatted_metadata <- format_qPCR_metadata(input$metadata_file$datapath)
 
         # Increment the progress bar, and update the detail text.
-        incProgress(1/6, detail = paste("Doing part", 2))
+        incProgress(1/6, detail = paste("Formatting Metadata", 2))
 
         # 3. remove the control records
         controls_removed <- remove_null_records(formatted_metadata, raw_multiplex_data_list)
@@ -317,19 +317,17 @@ shinyAppServer <- function(input, output, session) {
         formatted_metadata <- controls_removed[[2]]
         raw_multiplex_data_list <-controls_removed[[1]]
 
-        incProgress(1/6, detail = paste("Doing part", 3))
+        incProgress(1/6, detail = paste("Handling Control Records", 3))
 
         # 4. Calculate the second derivative threshold
-        # use lapply to set the wellLocations as the rownames
-        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, "rownames<-", raw_multiplex_data_list[[1]]$wellLocation)
-        well_names <- raw_multiplex_data_list[[1]]$wellLocation
-
-        # remove the column that contains that information
-        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x){x <- x[,-1]})
-
         # convert all columns into numeric values
-        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x) {sapply(x, as.numeric)})
-        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, "rownames<-", well_names)
+        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x) {sapply(x[,c(2:ncol(x))], as.numeric);x})
+        
+        # confirm WellLocation is the row name
+        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x){rownames(x)<- as.character(x$wellLocation);x})
+        
+        # remove the column that contains the wellLocation information
+        raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x){x <- x[,-1]})
 
         # calculate threshold
         raw_multiplex_data_list <- lapply(raw_multiplex_data_list,calculate_second_deriv_threshold)
@@ -337,24 +335,26 @@ shinyAppServer <- function(input, output, session) {
         # Add the userprovided threshold value
         raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x){merge(x, formatted_metadata[ , c("userProvidedThresholdValue", "wellLocation")], by="wellLocation")})
 
-        incProgress(1/6, detail = paste("Doing part", 4))
+        incProgress(1/6, detail = paste("Calculating Threshold", 4))
 
         # 5. Calculate the Cq value using the threshold
         raw_data_with_Cq <- lapply(raw_multiplex_data_list, function(x){add_Cq(x, "systemCalculatedThresholdValue", "systemCalculatedCqValue")})
 
-        incProgress(1/6, detail = paste("Doing part", 5))
+        incProgress(1/6, detail = paste("Calculating Cq", 5))
 
         # 6. If the user has threshold values provided, calculate the Cq value with that threshold
-        if(any(is.na(raw_data_with_Cq[[1]]$userProvidedThresholdValue))){
-          raw_data_with_Cq<- lapply(raw_data_with_Cq, function(x)cbind(x,CqvaluewithUserThreshold="No Threshold Value Provided by User"))
-        } else{
-          raw_data_with_Cq <- lapply(raw_data_with_Cq, function(x){add_Cq(x,"userProvidedThresholdValue", "CqvaluewithUserThreshold")})}
-
-        copy_numbers <- data.frame(wellLocation=formatted_metadata$wellLocation, logDNACopyNumber=rep("NA", nrow(raw_data_with_Cq[[1]])), rSquared=rep("NA", nrow(raw_data_with_Cq[[1]])))
-        # Assess if standard curve file has been provided, if so, process the fluorescence and metadata
-
+        for(target in 1:length(raw_data_with_Cq)){
+          copy_numbers <- list()
+          if(any(is.na(raw_data_with_Cq[[target]]$userProvidedThresholdValue))){
+            raw_data_with_Cq[[target]] <- cbind(raw_data_with_Cq[[target]],CqvaluewithUserThreshold="No Threshold Value Provided by User")
+          } else{
+            raw_data_with_Cq[[target]] <- add_Cq(raw_data_with_Cq[[target]],"userProvidedThresholdValue", "CqvaluewithUserThreshold")}
+          copy_numbers[[length(copy_numbers)+1]] <- data.frame(wellLocation=formatted_metadata$wellLocation, logDNACopyNumber=rep("NA", nrow(raw_data_with_Cq[[target]])), rSquared=rep("NA", nrow(raw_data_with_Cq[[target]])))
+        }
         # Assess if standard curve file has been provided, if so, process the fluorescence and metadata
         if (!is.null(input$SCI_fluorescence_file)){
+          print("is there a problem")
+          print(!is.null(input$SCI_fluorescence_file))
 
           # if the standard curve file is provided, the platform specific processing is required
           if (input$platform == "Biomeme two3/Franklin") {
@@ -382,20 +382,32 @@ shinyAppServer <- function(input, output, session) {
           std_w_threshold <- merge(std_w_threshold, std_meta[, c("wellLocation", "standardConc")])
 
           # 10. Calculate the copy number
-          copy_numbers <- calculate_copy_number(std_w_threshold, raw_data_with_Cq[[1]])
-
+          for (target in (1:length(raw_data_with_Cq))){
+            copy_numbers[[target]] <- calculate_copy_number(std_w_threshold, raw_data_with_Cq[[target]])
+          }
+          #copy_numbers <- calculate_copy_number(std_w_threshold, raw_data_with_Cq[[1]])
 
         }
         # 11. Merge all the data
-        all_merged_data <- merge(raw_data_with_Cq[[1]], formatted_metadata, by="wellLocation")
+        #all_merged_data <- merge(raw_data_with_Cq[[1]], formatted_metadata, by="wellLocation")
+        all_merged_data <- lapply(raw_data_with_Cq, function(x){merge(x,formatted_metadata, by="wellLocation")})
+        
         # add the copy number
-        all_merged_data <- merge(all_merged_data, copy_numbers, by="wellLocation")
-
+        for (target in 1:length(all_merged_data)){
+          all_merged_data[[target]] <- merge(all_merged_data[[target]], copy_numbers[[target]], by="wellLocation")
+        }
+        #all_merged_data <- lapply(all_merged_data, function(x){merge(x,copy_numbers, by="wellLocation")})
+        
+        # combine all dataframes in the list as a single dataframe
+        
+        #test <- do.call(rbind, all_merged_data)
+        all_merged_data <- do.call(rbind, all_merged_data)
+        
         # processing the data like cq column intervals
         all_merged_data <- merged_file_processing(all_merged_data, input$upload_data_name)
+        
 
-
-        incProgress(1/6, detail = paste("Doing part", 6))
+        incProgress(1/6, detail = paste("Merging Files", 6))
       })
 
       return(uploaded_data(all_merged_data))
@@ -468,13 +480,13 @@ shinyAppServer <- function(input, output, session) {
         raw_multiplex_data_list <- process_Multiplexed_RDML(input$qpcr_file_add$datapath)
 
         # Increment the progress bar, and update the detail text.
-        incProgress(1/6, detail = paste("Doing part", 1))
+        incProgress(1/6, detail = paste("Processing RDML", 1))
 
         # 2. Read in and format the metadata
         formatted_metadata <- format_qPCR_metadata(input$metadata_file_add$datapath)
 
         # Increment the progress bar, and update the detail text.
-        incProgress(1/6, detail = paste("Doing part", 2))
+        incProgress(1/6, detail = paste("Formatting Metadata", 2))
 
         # 3. remove the control records
         controls_removed <- remove_null_records(formatted_metadata, raw_multiplex_data_list)
@@ -482,7 +494,7 @@ shinyAppServer <- function(input, output, session) {
         formatted_metadata <- controls_removed[[2]]
         raw_multiplex_data_list <-controls_removed[[1]]
 
-        incProgress(1/6, detail = paste("Doing part", 3))
+        incProgress(1/6, detail = paste("Handling Controls", 3))
 
         # 4. Calculate the second derivative threshold
         # use lapply to set the wellLocations as the rownames
@@ -502,12 +514,12 @@ shinyAppServer <- function(input, output, session) {
         # Add the userprovided threshold value
         raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x){merge(x, formatted_metadata[ , c("userProvidedThresholdValue", "wellLocation")], by="wellLocation")})
 
-        incProgress(1/6, detail = paste("Doing part", 4))
+        incProgress(1/6, detail = paste("Calculating Threshold", 4))
 
         # 5. Calculate the Cq value using the threshold
         raw_data_with_Cq <- lapply(raw_multiplex_data_list, function(x){add_Cq(x, "systemCalculatedThresholdValue", "systemCalculatedCqValue")})
 
-        incProgress(1/6, detail = paste("Doing part", 5))
+        incProgress(1/6, detail = paste("Calculating Cq", 5))
 
         # 6. If the user has threshold values provided, calculate the Cq value with that threshold
         if(any(is.na(raw_data_with_Cq[[1]]$userProvidedThresholdValue))){
@@ -565,7 +577,7 @@ shinyAppServer <- function(input, output, session) {
 
 
 
-        incProgress(1/6, detail = paste("Doing part", 6))
+        incProgress(1/6, detail = paste("Merging Data", 6))
       })
 
       return(uploaded_data(new_merged_data))
@@ -1167,6 +1179,9 @@ shinyAppServer <- function(input, output, session) {
 
           #Function to process and merge files
           merged_biomem23_file <- merge_standardCurve_metadata_fluorescence_file(qpcr_biomem23_raw, metadata_biomem23)
+          
+          #Function to calculate LOD and LOQ
+          merged_biomem23_file <- calculate_SC_LOD_LOQ(merged_biomem23_file, input$LOQthres)
 
 
           #This merged datatable that will be used to populate map
@@ -1189,6 +1204,10 @@ shinyAppServer <- function(input, output, session) {
           #Function to process and merge files
           merged_mic_file <- merge_standardCurve_metadata_fluorescence_file(qpcr_MIC_raw,metadata_MIC)
           print(merged_mic_file)
+          
+          #Function to calculate LOD and LOQ
+          merged_mic_file <- calculate_SC_LOD_LOQ(merged_mic_file, input$LOQthres)
+          print(merged_mic_file)
 
           #This merged datatable that will be used to populate map
           return(standard_curve_tab_data(merged_mic_file))
@@ -1206,13 +1225,20 @@ shinyAppServer <- function(input, output, session) {
 
           #Function to process and merge files
           merged_StepOnePlus_file <- merge_standardCurve_metadata_fluorescence_file(standardCurve_StepOnePlus_raw, standardCurve_metadata_StepOnePlus)
-
+          
+          #Function to calculate LOD and LOQ
+          merged_StepOnePlus_file <- calculate_SC_LOD_LOQ(merged_StepOnePlus_file, input$LOQthres)
+          print(merged_StepOnePlus_file)
 
           return(standard_curve_tab_data(merged_StepOnePlus_file))
         }
       })
   })
 
+  # show the LOD warning Message
+  output$text <- renderPrint({
+    req(standard_curve_tab_data())
+    noquote(standard_curve_tab_data()$LODWarning[1])})
 
   SC_well_list <- reactive({
 
@@ -1257,6 +1283,7 @@ shinyAppServer <- function(input, output, session) {
   observeEvent(input$Uploaded_SC_submit | input$submit_zip, isolate({
 
     output$standardCurve_plot <- renderPlotly({
+      req(standard_curve_tab_data())
 
       #Add data to plot
       SC_plot_data <- standard_curve_tab_data()
@@ -1270,8 +1297,8 @@ shinyAppServer <- function(input, output, session) {
 
       #Change user provided Cq to numeric value to numeric
       SC_plot_data$systemCalculatedCqValue <- as.numeric(SC_plot_data$systemCalculatedCqValue)
-      SC_plot_data$LOQ<- as.numeric(SC_plot_data$LOQ)
-      SC_plot_data$LOD<- as.numeric(SC_plot_data$LOD)
+      SC_plot_data$systemCalculatedLOQ<- as.numeric(SC_plot_data$systemCalculatedLOQ)
+      SC_plot_data$systemCalculatedLOD<- as.numeric(SC_plot_data$systemCalculatedLOD)
 
       #Add column with residual values to data set
       regression_line <- lm(as.numeric(systemCalculatedCqValue) ~ as.numeric(standardConc), SC_plot_data)
@@ -1316,15 +1343,15 @@ shinyAppServer <- function(input, output, session) {
                                color = 'black',
                                formula = y ~ x) +
 
-                   geom_vline(xintercept = log(SC_plot_data$LOD),
+                   geom_vline(xintercept = log(SC_plot_data$systemCalculatedLOD),
                               color = "#ea5f94",
                               linetype="dashed") +
                    #
-                   geom_vline(xintercept = log(SC_plot_data$LOQ),
+                   geom_vline(xintercept = log(SC_plot_data$systemCalculatedLOQ),
                               color = "#0178A1",
                               linetype="dotted") +
 
-                   geom_text(aes(x= log(LOD),
+                   geom_text(aes(x= log(systemCalculatedLOD),
                                  label="LOD",
                                  y= mean(systemCalculatedCqValue)),
                              colour="#ea5f94",
@@ -1332,7 +1359,7 @@ shinyAppServer <- function(input, output, session) {
                              vjust = 1.2,
                              size=5) +
 
-                   geom_text(aes(x= log(LOQ),
+                   geom_text(aes(x= log(systemCalculatedLOQ),
                                  label="LOQ",
                                  y= mean(systemCalculatedCqValue)*1.2),
                              colour="#0178A1",
@@ -1394,6 +1421,7 @@ shinyAppServer <- function(input, output, session) {
   observeEvent(input$std_recalib, isolate({
 
     output$standardCurve_plot <- renderPlotly({
+      req(standard_curve_tab_data())
       #filter data based on well selected
       SC_plot_data <- standard_curve_tab_data()
       SC_plot_data <- SC_plot_data[SC_plot_data$wellLocation==input$SC_wells, ]
@@ -1407,8 +1435,8 @@ shinyAppServer <- function(input, output, session) {
 
       #Change user provided Cq to numeric value to numeric
       SC_plot_data$systemCalculatedCqValue <- as.numeric(SC_plot_data$systemCalculatedCqValue)
-      SC_plot_data$LOQ<- as.numeric(SC_plot_data$LOQ)
-      SC_plot_data$LOD<- as.numeric(SC_plot_data$LOD)
+      SC_plot_data$systemCalculatedLOQ<- as.numeric(SC_plot_data$systemCalculatedLOQ)
+      SC_plot_data$systemCalculatedLOD<- as.numeric(SC_plot_data$systemCalculatedLOD)
 
       #Add column with residual values to data set
       regression_line <- lm(as.numeric(systemCalculatedCqValue) ~ as.numeric(standardConc), SC_plot_data)
@@ -1453,11 +1481,11 @@ shinyAppServer <- function(input, output, session) {
                                color = 'black',
                                formula = y ~ x) +
 
-                   geom_vline(xintercept = log(SC_plot_data$LOD),
+                   geom_vline(xintercept = log(SC_plot_data$systemCalculatedLOD),
                               color = "#ea5f94",
                               linetype="dashed") +
                    #
-                   geom_vline(xintercept = log(SC_plot_data$LOQ),
+                   geom_vline(xintercept = log(SC_plot_data$systemCalculatedLOQ),
                               color = "#0178A1",
                               linetype="dotted") +
 
@@ -1521,6 +1549,118 @@ shinyAppServer <- function(input, output, session) {
                              autoWidth = TRUE,
                              columnDefs = list(list(width = '500px', targets = c(84)))))})
 
+  
+  
+  
+  ########### Low Quant eDNA LOD Method ###########
+output$lowquant_standardCurve_plot <- renderPlot({
+  req(standard_curve_tab_data())
+  
+  DAT <- standard_curve_tab_data()[, c("standardCurveName", "runRecordedBy", "systemCalculatedCqValue", "standardConc")]
+  # rename the columns to match the calculation
+  colnames(DAT) <- c("Target", "Lab", "Cq", "SQ")
+  
+  ## Ensure data is in the proper format:
+  DAT$Target <- as.factor(DAT$Target)
+  DAT$Lab <- as.factor(DAT$Lab)  #ML
+  DAT$Cq <- suppressWarnings(as.numeric(as.character(DAT$Cq))) #Non-numerical values (i.e. negative wells) will be converted to NAs
+  DAT$SQ <- suppressWarnings(as.numeric(as.character(DAT$SQ))) #Non-numerical values (i.e. NTC) will be converted to NAs
+  # by MDMAPR Definitions, if a Cq value is 40, there is no amplification and should be converted to NA
+  DAT$Cq[which(DAT$Cq==40)] <- NA
+  
+  # setting all negative controls to 0
+  DAT$SQ[is.na(DAT$SQ)] <- 0
+  DAT.df <- data.frame(DAT)
+  
+  
+  # compute poisson estimates
+  DAT.Tar.SQ <-  DAT.df %>%
+    group_by(Target, SQ) %>%
+    dplyr::summarise(detect=sum(!is.na(Cq)), n=n(),  Cqmean=mean(Cq, na.rm=TRUE), 
+                     Lab=Lab[1])
+  DAT.Tar.SQ <- droplevels(data.frame(DAT.Tar.SQ))
+  uLabs <- unique(DAT.Tar.SQ$Lab) #unique labs 
+  
+  DAT.Tar.SQ <- arrange(DAT.Tar.SQ, Lab, Target, SQ) #sort data by SQ in Target in Lab
+
+  ## Add variables to data set:  L10.SQ, phat, ... 
+  DAT.Tar.SQ <- within(DAT.Tar.SQ, {
+    L10.SQ <- log10(SQ)  
+    phat <- detect/n           #sample proportion detect
+    vphat <- phat*(1-phat)/n   #var of phat
+    lamhat <- -log(1-phat) 
+    vlamhat <- phat/n/(1-phat)  #var of lamhat using the delta method
+    sdlamhat <- sqrt(vlamhat)   #sd of lamhat using the delta method
+    MElamhat <- 1.96*sdlamhat  #margin of error for lambda hat using delta method
+  }
+  )
+  print("got here")
+  ## All Targets and Labs **DO NOT DUPLICATE Target names over Labs!!
+  uLabs <- unique(DAT.Tar.SQ$Lab)
+  uTargets <- unique(DAT.Tar.SQ$Target)
+  nTargets <- length(uTargets)
+  uLabsTargets <- unique(DAT.Tar.SQ[,c('Lab','Target')])
+  uLabsTargets$Lab <- as.character(uLabsTargets$Lab)
+  
+  #ensure ulabsTargets in same order as uTargets
+  uLabsTargets <- uLabsTargets[match(uLabsTargets$Target, uTargets),]  
+  uLabsTargets.names <- apply(uLabsTargets, 1, paste, collapse=', ')
+  
+  DAT.Tar.SQ <- within(DAT.Tar.SQ, {
+    CIexphat.lower <-  1 - qbeta(.975, n-detect+1, detect)  #exact phat bounds
+    CIexphat.upper <-  qbeta(.975, detect+1, n-detect)
+    
+    ## Use transformed exact phat bounds
+    Lamhatex.Lower <- -log(1 - CIexphat.lower)
+    Lamhatex.Upper <- -log(1 - CIexphat.upper)
+  }
+  )
+  print("got here2")
+  nndetect <- vector("list", nTargets) 
+  nrowTarget <- rep(0, length=nTargets)
+  
+  for(i in 1:nTargets) {
+    
+    print(paste0(nTargets, "is there a mistake"))
+    
+    Target.dat <- subset(DAT.Tar.SQ, Target==uTargets[i])
+    print(Target.dat)
+    bSQ <- !is.na(Target.dat$phat)  
+    lastSQ <- as.logical(cumprod(Target.dat$phat!=1 & bSQ)) 
+    ## removes first observations with SQ with phat=1 and larger SQs
+    Target.dat <- Target.dat[lastSQ,]
+    print(Target.dat)
+    print("with last sq")
+    nndetect[i] <- list(Target.dat )
+    nrowTarget[i] <- nrow(Target.dat)
+    
+    print(nrow(nndetect[[i]]))
+    
+    if(nrow(nndetect[[i]]) < 2) {print("we got here");next}
+    
+    maxSQ <- max(Target.dat$SQ)
+    maxlamhat <- max(Target.dat$lamhat)
+    
+    ######################### show this plot on the standard curve tab
+    print("got here 3")
+    plot(Target.dat$SQ, Target.dat$lamhat, xlog=TRUE, ylab='Lambda hat',
+         xlab='Starting copy number',
+         ylim=c(0, maxlamhat), xlim=c(0, maxSQ), main=uLabsTargets.names[i])
+    ## Transformed Exact CI
+    arrows(Target.dat$SQ, Target.dat$Lamhatex.Lower, Target.dat$SQ, 
+           Target.dat$Lamhatex.Upper,
+           length=0.05, angle=90, code=3)
+    ## overlay simple regression line and R-squared
+    jlm <- lm(lamhat ~ SQ, data=Target.dat)
+    abline(jlm, col=2)
+    legend("topleft", paste('lm Rsq=',round(summary(jlm)$r.squared, 2)), bty="n")
+    print("got here 4")
+
+  }
+})  
+  
+  
+  
   #qPCR Data Overview page ---------------------------
 
   ##Presence Absence table

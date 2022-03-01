@@ -18,10 +18,10 @@
 
 #Open terminal with r command
 # load packages
-load.lib<-c("shiny", "shinydashboard", "shinyjs","shinyWidgets","leaflet","DBI",
-            "leaflet.extras","data.table","ggplot2","dplyr","readxl","plotly","reactable","writexl",
+load.lib<-c("dplyr","ggplot2","knitr","kableExtra","RColorBrewer","shiny", "shinydashboard", "shinyjs","shinyWidgets","leaflet","DBI",
+            "leaflet.extras","data.table","readxl","plotly","reactable","writexl",
             "xfun","berryFunctions","RDML","htmltools","tidyverse", "methods","utils","stats", "MDMAPR",
-            "bslib","htmlwidgets","DT","logging", "shinycssloaders", "maps", "shinythemes", "datadigest", "rio", "stargazer", "corrplot", "data.table", "plyr")
+            "bslib","htmlwidgets","DT","logging", "shinycssloaders", "maps", "shinythemes", "datadigest", "rio", "stargazer", "corrplot", "plyr")
 
 install.lib<-load.lib[!load.lib %in% installed.packages()]
 for(lib in install.lib) install.packages(lib,dependencies=TRUE)
@@ -35,3 +35,5 @@ source("./shinyAppServer.R")
 source("./shinyAppUI.R")
 
 shinyApp(ui = shinyAppUI, server = shinyAppServer)
+
+unclass(as.Date("1971-01-01"))

@@ -119,6 +119,28 @@ remove_null_records <- function(meta_data, fluor_file_list){
   return(cleaned_data)
 }
 
+
+remove_null_records_test <- function(formatted_metadata, raw_multiplex_data_list){
+  # This function will change the list and metadata files in place
+  meta_data_name = deparse(substitute(formatted_metadata))
+  fluor_file_list_name = deparse(substitute(raw_multiplex_data_list))
+  if(length(which(grepl("null", tolower(formatted_metadata$sampleName))))!=0){
+    # get the position of the records that have null in the sample names
+    control_well_locations <- as.character(formatted_metadata$wellLocation[which(tolower(formatted_metadata$sampleName)=="null")])
+    # remove these records from the fluorescence files (if present)
+    raw_multiplex_data_list <- lapply(raw_multiplex_data_list, function(x) x[-c(which(as.character(x$wellLocation) %in%
+                                                                                        control_well_locations)),])
+    # remove these records from the metadata
+    # create a list to store these elements (they will be unlisted and brought back into the global environment)
+    cleaned_data <- list(raw_multiplex_data_list, formatted_metadata)
+  }
+  else{
+    cleaned_data <- list(raw_multiplex_data_list, formatted_metadata)
+  }
+  return(cleaned_data)
+}
+
+
 ############### Calculating the Threshold Value ##################
 calculate_second_deriv_threshold <- function(fluorescence_values_df) {
 

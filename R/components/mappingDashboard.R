@@ -21,13 +21,13 @@ mappingDashboard <- function() {
 
               column(width = 12,
                      box(width = NULL, solidHeader = TRUE,
-                         withSpinner(leafletOutput("mymap", height = 800))))),
+                         withSpinner(leafletOutput("mymap", height = 700))))),
                          br(),
 
                          #Second Row on page for filter functions
                          fluidRow(
 
-                           div(style='height:300px; overflow-y: scroll',
+                           div(style='height:400px; overflow-y: scroll',
                                box( width = 12,
                                     title = "Filter Options",
                                     status = "warning",
@@ -176,19 +176,17 @@ mappingDashboard <- function() {
                                                        options = list('actions-box' = TRUE),
                                                        multiple = TRUE))
 
-                               ))),
+                               ),
 
           #Download Mapped data
-          fluidRow(p(strong("Mapped Markers Metadata"),
+          p(strong("Mapped Markers Metadata"),
                      style = "font-size:25px"),
                    downloadLink("downloadFilteredData",
                                 p("Download Mapped Markers Metadata",
                                   style = "font-size:16px;
                                       color:#F4412E;
-                                       text-decoration: underline;" ))),
-                   br(),
-
-          #Data table for mapped data.
-          withSpinner(fluidRow(DT::dataTableOutput("mapping_data")))
-  )
+                                       text-decoration: underline;" )),
+                   #Data table for mapped data.
+                   withSpinner(DT::dataTableOutput("mapping_data")))
+  ))
 }

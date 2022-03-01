@@ -210,7 +210,7 @@ merged_file <- merge_meta_flu_RDML(scraped_file_list)
 # create RDML file
 RDML.file <- process_RDML(merged_file)
 # select a file name for export
-outputname <- "processed_rdml_file.RDML"
+outputname <- "/Users/abiyogasekaram/Downloads/6SP.rdml"
 # export RDML file for later use
 RDML.file$AsXML(outputname)
 

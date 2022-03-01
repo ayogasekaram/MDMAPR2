@@ -606,3 +606,56 @@ process_SOP_uploaded_file_with_well_names <- function(fluorescence_file) {
 
 }
 
+# Function that calculates LOD and LOQ for the standard curve data using the generic method
+calculate_SC_LOD_LOQ <- function(merged_file, LOQthreshold){
+  LOD.Data <- merged_file[, c("standardCurveName", "runRecordedBy", "systemCalculatedCqValue", "standardConc")]
+  # rename the columns to match the calculation
+  colnames(LOD.Data) <- c("Target", "Lab", "Cq", "SQ")
+  
+  # now set a condition that will change all Cq of 40s to NA
+  LOD.Data$Cq[which(LOD.Data$Cq==40)] <- NA
+  
+  # Step 2: Determine the dilutions used in the standard curve for the target
+  Standards <- unique(LOD.Data$SQ[!is.na(LOD.Data$SQ)])
+  
+  # Step 3: Calculate the rate of detection for each standard (any well with a Cq value is considered a detection)
+  # Calculate other metrics for LOQ calculations (Cq mean, standard deviation, coefficient of variation)
+  DAT2 <- data.frame(Standards=Standards,Target=LOD.Data$Target[1],Reps=NA,Detects=NA,Cq.mean=NA,
+                     Cq.sd=NA,Cq.CV=NA)
+  
+  for(i in 1:nrow(DAT2)) {
+    DAT2$Reps[i] <- sum(LOD.Data$SQ==DAT2$Standards[i],na.rm=TRUE)
+    DAT2$Detects[i] <- sum(!is.na(LOD.Data$Cq)&LOD.Data$SQ==DAT2$Standards[i],na.rm=TRUE)
+    DAT2$DetectionRate[i] <- DAT2$Detects[i]/DAT2$Reps[i]
+    DAT2$Cq.mean[i] <- mean(LOD.Data$Cq[LOD.Data$SQ==DAT2$Standards[i]],na.rm=TRUE)
+    DAT2$Cq.sd[i] <- sd(LOD.Data$Cq[LOD.Data$SQ==DAT2$Standards[i]],na.rm=TRUE)
+    DAT2$Cq.CV[i] <- sqrt(2^(DAT2$Cq.sd[i]^2*log(2))-1)
+  }
+  
+  # Step 4: Determine the lowest concentration with at least a 95% detection rate
+  # we want to assess whether a concentration above the LOD has greater variation
+  
+  
+  A <- min(DAT2$Standards[DAT2$DetectionRate>=0.95])
+  LOD <- A
+  if(length(which(DAT2$DetectionRate<0.95))>0) {
+    B <- max(DAT2$Standards[DAT2$DetectionRate<0.95])
+    if(B>A) {
+      warning <- paste0("WARNING: For ",LOD.Data$Target[1],", ",B," copies/reaction standard detected at lower rate than ",A," copies/reaction standard.Please retest.")
+    }
+  }
+  if(length(which(DAT2$DetectionRate<0.95))==0) {
+    warning <- paste0("WARNING: LoD cannot be determined for ",LOD.Data$Target[1],", because it is lower than the lowest standard you tested.Report as <",A," copies/reaction, or retest with lower concentrations.")
+  }
+  
+  
+  # Step 5: Find the LOQ value (lowest standard concentration that can be quantified with a CV value below the defined threshold). Default CV value will be 35%.
+  threshold <- as.numeric(LOQthreshold)
+  LOQ <- min(DAT2$Standards[DAT2$Cq.CV<threshold], na.rm = T)
+  
+  merged_file$systemCalculatedLOD <- LOD
+  merged_file$LODWarning <- warning
+  merged_file$systemCalculatedLOQ <- LOQ
+  
+  return(merged_file)
+}
