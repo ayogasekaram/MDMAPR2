@@ -36,4 +36,3 @@ source("./shinyAppUI.R")
 
 shinyApp(ui = shinyAppUI, server = shinyAppServer)
 
-unclass(as.Date("1971-01-01"))
