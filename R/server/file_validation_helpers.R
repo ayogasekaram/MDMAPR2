@@ -317,7 +317,7 @@ user_uploaded_file_validate <- function(fluor_file, metadata_file, platform_type
   # If a standard curve file is provided, run a validation on them
   if (!is.null(standard_curve$datapath)){
     print("eval standard curve as true")
-
+    print("coming here without standard?")
     if(user_uploaded_standard_curve_file_validation(standard_curve, metadata_file, platform_type)==TRUE){
       print("something wrong with standard curve processing")
       return(TRUE)}

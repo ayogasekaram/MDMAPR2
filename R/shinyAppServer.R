@@ -1060,6 +1060,7 @@ shinyAppServer <- function(input, output, session) {
     req(input$tab_being_displayed == "dashboard")
 
     if (!is.null(uploaded_data())) {
+      print(as.data.frame(filtered()))
 
       leafletProxy("mymap", data = as.data.frame(filtered())) %>%
         clearMarkers() %>%
