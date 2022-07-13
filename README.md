@@ -19,7 +19,7 @@ You can install the released version of MDMAPR from
 install.packages("MDMAPR")
 ```
 
-## Example on how to run MDMAPR without database connection: 
+## Example on how to run MDMAPR: 
 ``` r
 library(MDMAPR)
 
