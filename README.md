@@ -11,13 +11,7 @@ The MDMAPR 2.0 is an open-source and extensible Shiny web application that is ab
 The MDMAPR 2.0 was developed by Alka Benawra and Abinaya Yogasekaram at the University of Guelph. 
 
 ## Installation
-
-You can install the released version of MDMAPR from
-[CRAN](https://CRAN.R-project.org) with:
-
-``` r
-install.packages("MDMAPR")
-```
+To install MDMAPR, please clone this repository and open the R Project in RStudio.
 
 ## Example on how to run MDMAPR: 
 ``` r
